@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.Python
+env/
+.venv/
+venv/
+venv.bak/
+
+# Project specifics
+test_output/
+_temp_web_input*
+_temp_*.html
+
+# Streamlit
+.streamlit/
