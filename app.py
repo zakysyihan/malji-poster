@@ -13,6 +13,13 @@ st.set_page_config(
     layout="centered"
 )
 
+@st.cache_resource
+def install_playwright():
+    os.system("playwright install chromium")
+
+# Automatically install Playwright Chromium binaries on Streamlit Cloud boot
+install_playwright()
+
 # Custom CSS for Premium Look
 st.markdown("""
     <style>
