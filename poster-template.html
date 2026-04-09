@@ -130,7 +130,13 @@
                     <td class="theme-text">{{ entry.theme }}</td>
                     <td class="speaker-text">{{ entry.speaker }}</td>
                     <td class="place-text">{{ entry.place }}</td>
-                    <td class="status-text">{{ entry.note }}</td>
+                    <td class="status-text">
+                        {% if entry.note|lower == 'libur' %}
+                        <span style="color: #d32f2f; font-weight: 900;">LIBUR</span>
+                        {% else %}
+                        {{ entry.note }}
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
