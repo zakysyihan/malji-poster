@@ -48,13 +48,21 @@ def parse_broadcast(content):
 
     # --- Extract date ---
     date_info = ""
-    for line in lines:
-        # Look for "Pekan" pattern
+    hijri_info = ""
+    for i, line in enumerate(lines):
         if re.search(r'Pekan', line, re.IGNORECASE):
             date_info = line.strip('*').strip('_').strip()
-            # Clean up any Markdown bold/italic markers
             date_info = re.sub(r'[*_]', '', date_info).strip()
+            # Look for Hijriyah line within next 3 lines
+            for j in range(i + 1, min(i + 4, len(lines))):
+                if re.search(r'Hijriyah|hijriyah|Hijri', lines[j], re.IGNORECASE):
+                    hijri_info = re.sub(r'[*_]', '', lines[j]).strip()
+                    hijri_info = re.sub(r'^Hijriyah\s*:\s*', '', hijri_info, flags=re.IGNORECASE).strip()
+                    break
             break
+    
+    if date_info and hijri_info:
+        date_info = f"{date_info} / {hijri_info}"
             
     if not date_info:
         try:
