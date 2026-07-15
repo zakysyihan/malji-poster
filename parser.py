@@ -3,6 +3,27 @@ import json
 import sys
 
 
+def _time_sort_key(time_str):
+    """Convert a time string to a sortable integer (minutes since midnight)."""
+    time_str = time_str.lower().strip()
+
+    # Prayer-based times (ordered by typical daily occurrence)
+    prayer_order = {
+        "subuh": 5 * 60, "dhuha": 8 * 60, "dzuhur": 12 * 60,
+        "ashar": 15 * 60 + 30, "maghrib": 18 * 60, "isya": 19 * 60,
+    }
+    for prayer, minutes in prayer_order.items():
+        if f"da {prayer}" in time_str.replace("'", ""):
+            return minutes
+
+    # Numeric time: "06.00", "09.00 - 10.00", "11.35 WIB"
+    m = re.search(r'(\d{1,2})[.:](\d{2})', time_str)
+    if m:
+        return int(m.group(1)) * 60 + int(m.group(2))
+
+    return 9999  # unknown times go last
+
+
 def parse_broadcast(content):
     """Parse a Malang Mengaji broadcast message into structured data."""
     content = content.replace('\r\n', '\n')
@@ -171,6 +192,11 @@ def parse_broadcast(content):
                 "time": time_m.group(1).strip() if time_m else "Ba'da Maghrib - selesai",
                 "note": note_m.group(1).strip() if note_m else "Umum",
             })
+
+    # Sort entries by time and re-number
+    parsed_entries.sort(key=lambda e: _time_sort_key(e["time"]))
+    for i, entry in enumerate(parsed_entries):
+        entry["no"] = i + 1
 
     return {
         "title": title,
