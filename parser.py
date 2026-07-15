@@ -150,7 +150,7 @@ def parse_broadcast(content):
             speaker_m = re.search(r'👤\s*(.*)', raw_entry)
             place_m = re.search(r'📍\s*(.*)', raw_entry)
             time_m = re.search(r'⏰\s*(.*)', raw_entry)
-            note_m = re.search(r'🚻\s*(.*)', raw_entry)
+            note_m = re.search(r'(?:🚻|❌)\s*(.*)', raw_entry)
 
             if not (theme_m and speaker_m and place_m):
                 continue
