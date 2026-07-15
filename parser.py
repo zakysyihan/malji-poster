@@ -74,12 +74,16 @@ def parse_broadcast(content):
         if re.search(r'Pekan', line, re.IGNORECASE):
             date_info = line.strip('*').strip('_').strip()
             date_info = re.sub(r'[*_]', '', date_info).strip()
-            # Look for Hijriyah line within next 3 lines
-            for j in range(i + 1, min(i + 4, len(lines))):
-                if re.search(r'Hijriyah|hijriyah|Hijri', lines[j], re.IGNORECASE):
-                    hijri_info = re.sub(r'[*_]', '', lines[j]).strip()
-                    hijri_info = re.sub(r'^Hijriyah\s*:\s*', '', hijri_info, flags=re.IGNORECASE).strip()
-                    break
+            # If Pekan line already contains a Hijri date (e.g. "/ 29 Muharram 1448 H"), skip
+            if not re.search(r'\d+\s+\w+\s+\d{4}\s+H', date_info):
+                # Look for a standalone Hijriyah date line within next 3 lines
+                for j in range(i + 1, min(i + 4, len(lines))):
+                    clean = re.sub(r'[*_]', '', lines[j]).strip()
+                    # Match lines like "Hijriyah: 1 Ṣafar 1448 H" only
+                    m = re.match(r'^Hijriyah\s*:\s*(\d+\s+\w+\s+\d{4}\s+H)', clean, re.IGNORECASE)
+                    if m:
+                        hijri_info = m.group(1).strip()
+                        break
             break
     
     if date_info and hijri_info:
