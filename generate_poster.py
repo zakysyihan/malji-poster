@@ -49,6 +49,10 @@ async def generate_poster(input_file: str, output_file: str) -> list[str]:
         return []
         
     chunks = [entries[i:i + chunk_size] for i in range(0, total_entries, chunk_size)]
+    
+    # Merge small remainder (< 3 entries) into the previous chunk
+    if len(chunks) > 1 and len(chunks[-1]) < 3:
+        chunks[-2].extend(chunks.pop())
     generated_files = []
     base_name, ext = os.path.splitext(output_file)
     

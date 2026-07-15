@@ -25,22 +25,21 @@ def parse_broadcast(content):
     subtitle = "Ba'da Maghrib wilayah Malang Raya"
     
     title_lower = title.lower()
-    content_lower = content.lower()
     
-    # Detect session type
+    # Detect session type — only from the title line
     if "jum'at" in title_lower or "jumat" in title_lower or "khutbah" in title_lower:
         template_type = "jumat"
         subtitle = "Khatib Jum'at"
-    elif "subuh" in title_lower or "dhuha" in title_lower or "ashar" in title_lower or \
-       "subuh" in content_lower or "dhuha" in content_lower or "ashar" in content_lower:
+    elif "subuh" in title_lower or "dhuha" in title_lower or "ashar" in title_lower:
         template_type = "subuh_ashar"
         subtitle = "Ba'da Subuh, Dhuha, Ashar Malang Raya"
-    elif "maghrib" in title_lower or "maghrib" in content_lower:
+    elif "maghrib" in title_lower:
         template_type = "maghrib"
         subtitle = "Ba'da Maghrib wilayah Malang Raya"
     else:
-        # Fallback based on emoji
-        if "☀️" in content:
+        # Fallback based on emoji in the first line only
+        first_line = lines[0] if lines else ""
+        if "☀️" in first_line:
             template_type = "subuh_ashar"
             subtitle = "Wilayah Malang Raya"
         else:
