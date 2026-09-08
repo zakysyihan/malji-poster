@@ -1,5 +1,3 @@
 streamlit
-playwright
-jinja2
 Pillow
 hijri-converter

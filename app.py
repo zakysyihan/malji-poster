@@ -1,10 +1,7 @@
 import streamlit as st
 import os
-import asyncio
 from generate_poster import generate_poster
 from parser import parse_broadcast
-import base64
-from PIL import Image
 
 # Page Configuration
 st.set_page_config(
@@ -12,13 +9,6 @@ st.set_page_config(
     page_icon="📖",
     layout="centered"
 )
-
-@st.cache_resource
-def install_playwright():
-    os.system("playwright install chromium")
-
-# Automatically install Playwright Chromium binaries on Streamlit Cloud boot
-install_playwright()
 
 # Custom CSS for Premium Look
 st.markdown("""
@@ -182,7 +172,7 @@ if generate_clicked:
                 
                 status.write("Parsing and Generating Data...")
                 # Run the generation
-                generated_files = asyncio.run(generate_poster(input_path, output_path))
+                generated_files = generate_poster(input_path, output_path)
                 
                 if generated_files:
                     status.update(label="Poster berhasil digenerate!", state="complete", expanded=False)

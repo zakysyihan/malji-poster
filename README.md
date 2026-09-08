@@ -12,8 +12,7 @@ An intelligent, zero-config web application designed to instantly transform raw 
 ## 🛠 Tech Stack
 
 - **Frontend UI:** `Streamlit` (A minimalist, single-step interface)
-- **Rendering Engine:** `Playwright` (Headless Chromium browser screenshotting)
-- **Templating:** `Jinja2` (HTML injections)
+- **Rendering Engine:** `Pillow` (Direct PNG compositing, no headless browser required)
 - **Language:** `Python 3.10+`
 
 ## 💻 Running Locally
@@ -23,7 +22,6 @@ To run this tool on your local machine:
 1. **Install Dependencies**
    ```bash
    pip install -r requirements.txt
-   playwright install chromium
    ```
 
 2. **Run the Streamlit App**
@@ -44,7 +42,7 @@ The architecture is built completely "push-to-deploy" ready for **Streamlit Comm
 1. Upload this repository to GitHub.
 2. Sign up on [Streamlit Community Cloud](https://share.streamlit.io/).
 3. Create a New App and point it to your repository (`app.py` as the main script).
-4. *Streamlit will automatically detect the included `packages.txt` and install the hidden Linux C++ dependencies required to run Playwright headlessly in the cloud.*
+4. No system packages or headless browsers are required — the poster is rendered with pure Pillow, so `requirements.txt` is all Streamlit Cloud needs to install.
 
 ---
 *© 2026 Malang Mengaji. Designed by Antigravity.*
