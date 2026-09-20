@@ -7,6 +7,7 @@ POSTER_W = 1587
 POSTER_H = 2245
 
 FONT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts", "Outfit-Variable.ttf")
+FALLBACK_FONT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts", "Amiri-Regular.ttf")
 
 TABLE_TOP = 485
 HEADER_BG_TOP = 488
@@ -44,6 +45,69 @@ def get_font(size, weight):
     return _font_cache[key]
 
 
+_fallback_font_cache = {}
+_outfit_cmap = None
+
+
+def get_fallback_font(size):
+    """Arabic-capable fallback (Amiri) for glyphs missing in Outfit, e.g. U+FDFA."""
+    if size not in _fallback_font_cache:
+        _fallback_font_cache[size] = ImageFont.truetype(FALLBACK_FONT_PATH, size)
+    return _fallback_font_cache[size]
+
+
+def _load_outfit_cmap():
+    global _outfit_cmap
+    if _outfit_cmap is None:
+        try:
+            from fontTools.ttLib import TTFont
+            _outfit_cmap = TTFont(FONT_PATH).getBestCmap()
+        except Exception:
+            _outfit_cmap = {}
+    return _outfit_cmap
+
+
+def _char_needs_fallback(ch):
+    o = ord(ch)
+    if o < 0x0590:
+        return False
+    if (0x0600 <= o <= 0x06FF) or (0x0750 <= o <= 0x077F) or (0x08A0 <= o <= 0x08FF) or (0xFB50 <= o <= 0xFDFF) or (0xFE70 <= o <= 0xFEFF):
+        return True
+    cmap = _load_outfit_cmap()
+    if cmap:
+        return o not in cmap
+    return True
+
+
+def _font_for_char(ch, primary, fallback):
+    return fallback if _char_needs_fallback(ch) else primary
+
+
+def mixed_width(text, primary, fallback):
+    total = 0.0
+    for ch in text:
+        total += _font_for_char(ch, primary, fallback).getlength(ch)
+    return total
+
+
+def draw_mixed_text(draw, x, baseline_y, text, primary, fallback, fill, tracking=0):
+    cx = x
+    for ch in text:
+        f = _font_for_char(ch, primary, fallback)
+        draw.text((cx, baseline_y), ch, font=f, fill=fill, anchor="ls")
+        cx += f.getlength(ch) + tracking
+    return cx
+
+
+def _resolve_fallback(font, fallback):
+    if fallback is not None:
+        return fallback
+    try:
+        return get_fallback_font(font.size)
+    except Exception:
+        return font
+
+
 def select_background(template_type):
     if template_type == "maghrib":
         return "kajian_maghrib_template.png"
@@ -52,24 +116,29 @@ def select_background(template_type):
     return "kajian_subuh_ashar_template.png"
 
 
-def wrap_text(text, font, max_width):
+def wrap_text(text, font, max_width, fallback=None):
     if not text:
         return []
+    fallback = _resolve_fallback(font, fallback)
+
+    def width(s):
+        return mixed_width(s, font, fallback)
+
     words = text.split(" ")
     lines = []
     current = ""
     for word in words:
         candidate = word if not current else current + " " + word
-        if font.getlength(candidate) <= max_width:
+        if width(candidate) <= max_width:
             current = candidate
             continue
         if current:
             lines.append(current)
             current = word
         else:
-            while font.getlength(word) > max_width and len(word) > 1:
+            while width(word) > max_width and len(word) > 1:
                 cut = 1
-                while cut < len(word) and font.getlength(word[:cut + 1]) <= max_width:
+                while cut < len(word) and width(word[:cut + 1]) <= max_width:
                     cut += 1
                 lines.append(word[:cut])
                 word = word[cut:]
@@ -84,37 +153,37 @@ def centered_baseline(draw, text, font, cy):
     return cy - (y1 - y0) / 2 - y0
 
 
-def draw_centered_text(draw, cx, baseline_y, text, font, fill, tracking=0):
-    widths = [font.getlength(ch) for ch in text]
-    total = sum(widths) + tracking * (len(text) - 1)
+def draw_centered_text(draw, cx, baseline_y, text, font, fill, tracking=0, fallback=None):
+    fallback = _resolve_fallback(font, fallback)
+    total = mixed_width(text, font, fallback) + tracking * (len(text) - 1)
     x = cx - total / 2
-    for ch, w in zip(text, widths):
-        draw.text((x, baseline_y), ch, font=font, fill=fill, anchor="ls")
-        x += w + tracking
+    draw_mixed_text(draw, x, baseline_y, text, font, fallback, fill, tracking=tracking)
 
 
-def draw_text_block(draw, cx, cy, text, font, fill, max_width, lines_step):
+def draw_text_block(draw, cx, cy, text, font, fill, max_width, lines_step, fallback=None):
     if not text:
         return
-    lines = wrap_text(text, font, max_width) or [text]
+    fallback = _resolve_fallback(font, fallback)
+    lines = wrap_text(text, font, max_width, fallback) or [text]
     n = len(lines)
     y0_first = draw.textbbox((0, 0), lines[0], font=font, anchor="ls")[1]
     y1_last = draw.textbbox((0, 0), lines[-1], font=font, anchor="ls")[3]
     height = lines_step * (n - 1) + (y1_last - y0_first)
     baseline = cy - height / 2 - y0_first
     for i, line in enumerate(lines):
-        width = font.getlength(line)
-        draw.text((cx - width / 2, baseline + i * lines_step), line, font=font, fill=fill, anchor="ls")
+        width = mixed_width(line, font, fallback)
+        draw_mixed_text(draw, cx - width / 2, baseline + i * lines_step, line, font, fallback, fill)
 
 
-def draw_shadowed_date(draw, text, font):
+def draw_shadowed_date(draw, text, font, fallback=None):
+    fallback = _resolve_fallback(font, fallback)
     x, top = 85, 417
     y0 = draw.textbbox((0, 0), text, font=font, anchor="ls")[1]
     baseline = top - y0
     shadow = (60, 30, 0)
-    draw.text((x + 2, baseline + 2), text, font=font, fill=shadow, anchor="ls")
-    draw.text((x + 1, baseline + 1), text, font=font, fill=shadow, anchor="ls")
-    draw.text((x, baseline), text, font=font, fill=(255, 255, 255), anchor="ls")
+    draw_mixed_text(draw, x + 2, baseline + 2, text, font, fallback, shadow)
+    draw_mixed_text(draw, x + 1, baseline + 1, text, font, fallback, shadow)
+    draw_mixed_text(draw, x, baseline, text, font, fallback, (255, 255, 255))
 
 
 def compute_row_heights(lines_counts):

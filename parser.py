@@ -2,6 +2,12 @@ import re
 import json
 import sys
 
+# Matches a Hijri date like "28 Rabiul Awal 1448 H", "1 Safar 1448 H",
+# "15 Jumadil Awal 1447 H", "1 Rabi'ul Akhir 1447 H".
+# Month names can be 1-3 words (Rabiul Awal, Jumadil Akhir, Dzulqa'dah, ...),
+# so we must NOT restrict the month to a single \w+ token.
+HIJRI_DATE_RE = r'\d{1,2}\s+.+?\s+\d{4}\s*H'
+
 
 def _time_sort_key(time_str):
     """Convert a time string to a sortable integer (minutes since midnight)."""
@@ -75,12 +81,13 @@ def parse_broadcast(content):
             date_info = line.strip('*').strip('_').strip()
             date_info = re.sub(r'[*_]', '', date_info).strip()
             # If Pekan line already contains a Hijri date (e.g. "/ 29 Muharram 1448 H"), skip
-            if not re.search(r'\d+\s+\w+\s+\d{4}\s+H', date_info):
+            if not re.search(HIJRI_DATE_RE, date_info):
                 # Look for a standalone Hijriyah date line within next 3 lines
                 for j in range(i + 1, min(i + 4, len(lines))):
                     clean = re.sub(r'[*_]', '', lines[j]).strip()
-                    # Match lines like "Hijriyah: 1 Ṣafar 1448 H" only
-                    m = re.match(r'^Hijriyah\s*:\s*(\d+\s+\w+\s+\d{4}\s+H)', clean, re.IGNORECASE)
+                    # Match lines like "Hijriyah: 1 Ṣafar 1448 H" or
+                    # "Hijriyah: 28 Rabiul Awal 1448 H" (multi-word months)
+                    m = re.match(r'^Hijriyah\s*:\s*(' + HIJRI_DATE_RE + r')', clean, re.IGNORECASE)
                     if m:
                         hijri_info = m.group(1).strip()
                         break
