@@ -1,12 +1,106 @@
 import re
 import json
 import sys
+import os
+from datetime import datetime, date, timedelta
+from functools import lru_cache
 
 # Matches a Hijri date like "28 Rabiul Awal 1448 H", "1 Safar 1448 H",
 # "15 Jumadil Awal 1447 H", "1 Rabi'ul Akhir 1447 H".
 # Month names can be 1-3 words (Rabiul Awal, Jumadil Akhir, Dzulqa'dah, ...),
 # so we must NOT restrict the month to a single \w+ token.
 HIJRI_DATE_RE = r'\d{1,2}\s+.+?\s+\d{4}\s*H'
+
+MALANG_LATITUDE = -7.9797
+MALANG_LONGITUDE = 112.6304
+KEMENAG_METHOD_ID = 20
+JUMAT_PRAYER_TIME_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".jumat_prayer_cache.json")
+
+
+def _fetch_jumat_prayer_time(target_date: date) -> str:
+    """Fetch Friday prayer (Dhuhr) time for Malang from Aladhan API using Kemenag method.
+    
+    Returns time string in format "HH.MM WIB" or falls back to "11.35 WIB" on error.
+    """
+    try:
+        import urllib.request
+        import urllib.error
+        
+        date_str = target_date.strftime("%d-%m-%Y")
+        url = (
+            f"https://api.aladhan.com/v1/timings/{date_str}"
+            f"?latitude={MALANG_LATITUDE}&longitude={MALANG_LONGITUDE}"
+            f"&method={KEMENAG_METHOD_ID}&school=0"
+        )
+        
+        req = urllib.request.Request(url, headers={"User-Agent": "MalangMengaji/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode())
+        
+        if data.get("code") == 200 and "data" in data:
+            timings = data["data"].get("timings", {})
+            dhuhr = timings.get("Dhuhr", "")
+            if dhuhr:
+                time_24 = dhuhr.split(" ")[0]
+                hour, minute = time_24.split(":")
+                return f"{int(hour):02d}.{minute} WIB"
+    except Exception:
+        pass
+    return "11.35 WIB"
+
+
+def _load_cached_prayer_time() -> tuple[str, date] | None:
+    """Load cached prayer time if it's for today."""
+    try:
+        if os.path.exists(JUMAT_PRAYER_TIME_CACHE_FILE):
+            with open(JUMAT_PRAYER_TIME_CACHE_FILE, "r") as f:
+                cache = json.load(f)
+            cached_date = datetime.strptime(cache["date"], "%Y-%m-%d").date()
+            if cached_date == date.today():
+                return cache["time"], cached_date
+    except Exception:
+        pass
+    return None
+
+
+def _save_cached_prayer_time(prayer_time: str, target_date: date) -> None:
+    """Save prayer time to cache."""
+    try:
+        cache = {"date": target_date.strftime("%Y-%m-%d"), "time": prayer_time}
+        with open(JUMAT_PRAYER_TIME_CACHE_FILE, "w") as f:
+            json.dump(cache, f)
+    except Exception:
+        pass
+
+
+def get_jumat_prayer_time(target_date: date | None = None) -> str:
+    """Get Friday prayer time for Malang, using cache to avoid repeated API calls.
+    
+    Args:
+        target_date: The date to get prayer time for. Defaults to next Friday.
+    
+    Returns:
+        Time string in format "HH.MM WIB"
+    """
+    if target_date is None:
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo('Asia/Jakarta')
+        except ImportError:
+            import pytz
+            tz = pytz.timezone('Asia/Jakarta')
+        
+        now = datetime.now(tz)
+        days_ahead = (4 - now.weekday()) % 7
+        target_date = (now + timedelta(days=days_ahead)).date()
+    
+    cached = _load_cached_prayer_time()
+    if cached and cached[1] == target_date:
+        return cached[0]
+    
+    prayer_time = _fetch_jumat_prayer_time(target_date)
+    _save_cached_prayer_time(prayer_time, target_date)
+    return prayer_time
 
 
 def _time_sort_key(time_str):
@@ -96,25 +190,24 @@ def parse_broadcast(content):
     if date_info and hijri_info:
         date_info = f"{date_info} / {hijri_info}"
             
+    # Determine target date early for prayer time calculation
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo('Asia/Jakarta')
+    except ImportError:
+        import pytz
+        tz = pytz.timezone('Asia/Jakarta')
+    
+    now = datetime.now(tz)
+    
+    if template_type == "jumat":
+        days_ahead = (4 - now.weekday()) % 7
+        target_date = now + timedelta(days=days_ahead)
+    else:
+        target_date = now
+
     if not date_info:
         try:
-            from datetime import datetime, timedelta
-            try:
-                from zoneinfo import ZoneInfo
-                tz = ZoneInfo('Asia/Jakarta')
-            except ImportError:
-                import pytz
-                tz = pytz.timezone('Asia/Jakarta')
-                
-            now = datetime.now(tz)
-            
-            # Smart determination of date based on type
-            if template_type == "jumat":
-                days_ahead = (4 - now.weekday()) % 7
-                target_date = now + timedelta(days=days_ahead)
-            else:
-                target_date = now
-                
             week_of_month = (target_date.day - 1) // 7 + 1
             
             days_id = {"Monday": "Senin", "Tuesday": "Selasa", "Wednesday": "Rabu", "Thursday": "Kamis", "Friday": "Jum'at", "Saturday": "Sabtu", "Sunday": "Ahad"}
@@ -158,7 +251,7 @@ def parse_broadcast(content):
                 "theme": tema,
                 "speaker": speaker,
                 "place": place,
-                "time": "11.35 WIB",
+                "time": get_jumat_prayer_time(target_date.date()),
                 "note": "Ikhwan"
             })
     else:
