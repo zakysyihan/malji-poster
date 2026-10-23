@@ -238,9 +238,16 @@ def parse_broadcast(content):
         raw_entries = re.split(r'\n(?=\d+\.\s)', entries_section)
         parsed_entries = []
         for raw_entry in raw_entries:
-            # Filter out Google Maps links before processing
-            entry_lines = [l.strip() for l in raw_entry.split('\n') if l.strip()]
-            entry_lines = [l for l in entry_lines if "maps.app.goo.gl" not in l and "goo.gl/maps" not in l and "google.com/maps" not in l]
+            # Strip Google Maps URLs from lines, then drop empty lines
+            entry_lines = []
+            for l in raw_entry.split('\n'):
+                l = l.strip()
+                if not l:
+                    continue
+                # Remove any URL (gmaps or otherwise) embedded in the line
+                l = re.sub(r'https?://\S+', '', l).strip()
+                if l:
+                    entry_lines.append(l)
             if not entry_lines or not re.match(r'^\d+\.\s', entry_lines[0]):
                 continue
             
