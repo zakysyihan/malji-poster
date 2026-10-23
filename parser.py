@@ -283,8 +283,6 @@ def parse_broadcast(content):
             tema = re.sub(r'^Tema\s*:\s*', '', tema, flags=re.IGNORECASE).strip('*"\' ')
             
             note = "Ikhwan"
-            if gmaps_link:
-                note = f"Ikhwan | {gmaps_link}"
             
             parsed_entries.append({
                 "no": len(parsed_entries) + 1,
