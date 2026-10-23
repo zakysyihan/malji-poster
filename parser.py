@@ -231,6 +231,9 @@ def parse_broadcast(content):
         entries_section = sections[-1] if len(sections) > 1 else content
         entries_section = re.split(r'••════••|_Barakallahufiikum_', entries_section)[0]
         
+        # Normalize unicode line separators (U+2028, U+2029) to regular newlines
+        entries_section = entries_section.replace('\u2028', '\n').replace('\u2029', '\n')
+        
         # Split by "1. ", "2. ", etc
         raw_entries = re.split(r'\n(?=\d+\.\s)', entries_section)
         parsed_entries = []
