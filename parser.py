@@ -240,11 +240,51 @@ def parse_broadcast(content):
                 continue
             
             speaker = re.sub(r'^\d+\.\s*', '', entry_lines[0]).strip()
-            place = entry_lines[1] if len(entry_lines) > 1 else ""
-            tema = entry_lines[2] if len(entry_lines) > 2 else "Tematik"
+            
+            if len(entry_lines) < 2:
+                continue
+            place = entry_lines[1]
+            
+            # Detect format and extract theme + gmaps link
+            # Old format: speaker, place, theme, [link]
+            # New format: speaker, place, link, theme
+            tema = "Tematik"
+            gmaps_link = ""
+            
+            if len(entry_lines) >= 3:
+                line2 = entry_lines[2]
+                line3 = entry_lines[3] if len(entry_lines) > 3 else ""
+                
+                is_line2_link = "maps.app.goo.gl" in line2 or "goo.gl/maps" in line2 or "google.com/maps" in line2
+                is_line3_link = "maps.app.goo.gl" in line3 or "goo.gl/maps" in line3 or "google.com/maps" in line3
+                
+                if is_line2_link and is_line3_link:
+                    # Both are links? Take line2 as link, line3 as theme
+                    gmaps_link = line2.strip()
+                    tema = line3.strip()
+                elif is_line2_link:
+                    # New format: link at line 2, theme at line 3
+                    gmaps_link = line2.strip()
+                    tema = line3.strip() if line3 else "Tematik"
+                elif is_line3_link:
+                    # Old format: theme at line 2, link at line 3
+                    tema = line2.strip()
+                    gmaps_link = line3.strip()
+                else:
+                    # No link found, line 2 is theme
+                    tema = line2.strip()
+                    # Check remaining lines for link
+                    for line in entry_lines[3:]:
+                        if "maps.app.goo.gl" in line or "goo.gl/maps" in line or "google.com/maps" in line:
+                            gmaps_link = line.strip()
+                            break
             
             # clean tema if starts with Tema:
             tema = re.sub(r'^Tema\s*:\s*', '', tema, flags=re.IGNORECASE).strip('*"\' ')
+            
+            note = "Ikhwan"
+            if gmaps_link:
+                note = f"Ikhwan | {gmaps_link}"
             
             parsed_entries.append({
                 "no": len(parsed_entries) + 1,
@@ -252,7 +292,7 @@ def parse_broadcast(content):
                 "speaker": speaker,
                 "place": place,
                 "time": get_jumat_prayer_time(target_date.date()),
-                "note": "Ikhwan"
+                "note": note
             })
     else:
         # Get the section between the separator lines and the footer
